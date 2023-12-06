@@ -1,0 +1,25 @@
+Parameters:
+  BucketName:
+    Type: String
+    MinLength: 3
+    MaxLength: 64
+    AllowedPattern: ^[a-z0-9][a-z0-9./-]*[a-z0-9]$
+
+Resources:
+  Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      BucketName: !Ref BucketName
+
+Outputs:
+  BucketName:
+    Value: !Ref Bucket
+    Description: The name of the created S3 bucket
+
+  BucketArn:
+    Value: !GetAtt Bucket.Arn
+    Description: The ARN of the created S3 bucket

@@ -1,0 +1,205 @@
+Parameters:
+  DatabaseName:
+    Description: The name of the first database in the Amazon Redshift Serverless environment.
+    Type: String
+    Default: dev
+    MaxLength: 127
+    AllowedPattern: "[a-zA-Z][a-zA-Z_0-9+.@-]*"
+
+  AdminUsername:
+    Description: The administrator's user name for Redshift Serverless Namespace being created.
+    Type: String
+    Default: admin
+    AllowedPattern: "[a-zA-Z][a-zA-Z_0-9+.@-]*"
+
+  AdminUserPassword:
+    Description: The password associated with admin user.
+    Type: String
+    NoEcho: true
+    MinLength: 8
+    MaxLength: 64
+    AllowedPattern: "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)[^\\x00-\\x20\\x22\\x27\\x2f\\x40\\x5c\\x7f-\\uffff]+"
+
+  NamespaceName:
+    Description: A unique identifier that defines the Namespace.
+    Type: String
+    MinLength: 3
+    MaxLength: 64
+    AllowedPattern: "^[a-z0-9-]+$"
+
+  WorkgroupName:
+    Description: A unique identifier that defines the Workspace.
+    Type: String
+    MinLength: 3
+    MaxLength: 64
+    AllowedPattern: "^[a-z0-9-]*"
+
+  WorkgroupPort:
+    Description: The custom port to use when connecting to a workgroup
+    Type: Number
+    Default: 5439
+
+  BaseRPU:
+    Description: Base RPU for Redshift Serverless Workgroup.
+    Type: Number
+    MinValue: 32
+    MaxValue: 512
+    Default: 128
+    AllowedValues:
+      - 32
+      - 40
+      - 48
+      - 56
+      - 64
+      - 72
+      - 80
+      - 88
+      - 96
+      - 104
+      - 112
+      - 120
+      - 128
+      - 136
+      - 144
+      - 152
+      - 160
+      - 168
+      - 176
+      - 184
+      - 192
+      - 200
+      - 208
+      - 216
+      - 224
+      - 232
+      - 240
+      - 248
+      - 256
+      - 264
+      - 272
+      - 280
+      - 288
+      - 296
+      - 304
+      - 312
+      - 320
+      - 328
+      - 336
+      - 344
+      - 352
+      - 360
+      - 368
+      - 376
+      - 384
+      - 392
+      - 400
+      - 408
+      - 416
+      - 424
+      - 432
+      - 440
+      - 448
+      - 456
+      - 464
+      - 472
+      - 480
+      - 488
+      - 496
+      - 504
+      - 512
+
+  PubliclyAccessible:
+    Description: Redshift Serverless instance to be publicly accessible.
+    Type: String
+    AllowedValues:
+      - true
+      - false
+    Default: false
+
+  SubnetIds:
+    Description: You must have at least three subnets, and they must span across three Availability Zones.
+    Type: List<AWS::EC2::Subnet::Id>
+
+  SecurityGroupIds:
+    Description: The list of SecurityGroupIds in your Virtual Private Cloud (VPC).
+    Type: List<AWS::EC2::SecurityGroup::Id>
+
+  LogExportsList:
+    Description: Provide comma-separated values from the list "userlog," "connectionlog," "useractivitylog." E.g userlog,connectionlog,useractivitylog. If left blank, LogExport is turned off.
+    Type: CommaDelimitedList
+    Default: userlog,connectionlog,useractivitylog
+
+  EnhancedVpcRouting:
+    Description: The value that specifies whether to enable enhanced virtual private cloud (VPC) routing, which forces Amazon Redshift Serverless to route traffic through your VPC.
+    Type: String
+    AllowedValues:
+      - true
+      - false
+    Default: false
+
+Resources:
+  Namespace:
+    Type: AWS::RedshiftServerless::Namespace
+    Properties:
+      AdminUsername: !Ref AdminUsername
+      AdminUserPassword: !Ref AdminUserPassword
+      DbName: !Ref DatabaseName
+      NamespaceName: !Ref NamespaceName
+      LogExports: !Ref LogExportsList
+      IamRoles: 
+        - !GetAtt S3ReadOnlyAccessRole.Arn
+
+  Workgroup:
+    DependsOn:
+      - Namespace
+    Type: AWS::RedshiftServerless::Workgroup
+    Properties:
+      WorkgroupName: !Ref WorkgroupName
+      Port: !Ref WorkgroupPort
+      NamespaceName: !Ref NamespaceName
+      BaseCapacity: !Ref BaseRPU
+      PubliclyAccessible: !Ref PubliclyAccessible
+      SubnetIds: !Ref SubnetIds
+      SecurityGroupIds: !Ref SecurityGroupIds
+      EnhancedVpcRouting: !Ref EnhancedVpcRouting
+
+  S3ReadOnlyAccessRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "redshift-s3-access-${NamespaceName}-${AWS::Region}"
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - redshift.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess
+
+Outputs:
+  WorkgroupPort:
+    Description: The port of the created Redshift Serverless Workgroup
+    Value: !Ref WorkgroupPort
+
+  WorkgroupHost:
+    Description: The host of the created Redshift Serverless Workgroup
+    Value: !Join
+      - '.'
+      - - !Ref WorkgroupName
+        - !Ref AWS::AccountId
+        - !Ref AWS::Region
+        - redshift-serverless.amazonaws.com
+
+  WorkgroupName:
+    Description: The name of the created Redshift Serverless Workgroup
+    Value: !Ref WorkgroupName
+
+  WorkgroupDatabase:
+    Description: The database name of the created Redshift Serverless Workgroup
+    Value: !Ref DatabaseName
+
+  S3ReadOnlyAccessRoleArn:
+    Description: The ARN of the created S3 Read-Only Access Role for Redshift Serverless Namespace
+    Value: !GetAtt S3ReadOnlyAccessRole.Arn
